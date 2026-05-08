@@ -48,7 +48,7 @@
     <!-- 添加无尽的物理地板平面 -->
     <geom name="floor" type="plane" size="0 0 1" material="matplane" condim="3" />
 
-    <body name="base_link" pos="0.00000000 0.00000000 0.00000000" quat="1 0 0 0" childclass="robot">
+    <body name="base_link" pos="0.00000000 0.60000000 0.00000000" quat="1 0 0 0" childclass="robot">
       <geom name="base_link_collision_0" pos="-0.125 0.125 0.425" quat="1.0 0.0 0.0 0.0" type="box" size="0.0725 0.0725 0.415" class="collision" />
       <geom name="base_link_collision_1" pos="-0.125 0.125 0.005" quat="1.0 0.0 0.0 0.0" type="box" size="0.125 0.125 0.005" class="collision" />
       <geom name="base_link_visual" pos="0 0 0" quat="0.7071054825112363 0.7071080798594735 0.0 0.0" material="base_link_white" type="mesh" mesh="base_link.obj" class="visual" />
@@ -75,7 +75,7 @@
                 <inertial pos="-0.00983151017542139 0.0599333115427437 -0.00175977245523265" quat="0.49052611595707657 0.4913835391698289 0.5094157804067029 0.5083521512393036" mass="0.77675171638187" diaginertia="0.0040448627 0.0028051639 0.0018509871" />
                 <geom name="gripper_collision" pos="0.091 -0.04875 0" quat="1.0 0.0 0.0 0.0" type="box" size="0.121 0.04875 0.07" class="collision" />
                 <geom name="gripper_visual" pos="0.121 -0.1 0" quat="1.0 0.0 0.0 0.0" material="base_link_white" type="mesh" mesh="gripper.obj" class="visual" />
-                <site name="ee_site" pos="0.2 0 0" size="0.02" />
+                <site name="ee_site" pos="0.121 -0.037 -0.06875" />
               </body>
             </body>
           </body>

@@ -144,9 +144,9 @@ def main():
     #         viewer.sync()
     #         time.sleep(0.01)
     model_path="../my_robot_description/urdf/Arm_mujoco.xml"
-    Arm_Path_Planner = Path_Planning.Arm_Path_Planner(model_path, site_name="ee_site",num_steps=100,max_steps=100, tol=1e-4)
+    Arm_Path_Planner = Path_Planning.Arm_Path_Planner(model_path, site_name="ee_site",num_steps=100,max_steps=100, tol=1e-3)
     Arm_Path_Planner.init_sim()
-    Arm_Path_Planner.set_target([0.6, 0.6, 0.25])
+    Arm_Path_Planner.set_target([0.1, 0.1, 0.25])
     Arm_Path_Planner.gogogo_sim()
     Arm_Path_Planner.get_now_position()
     # target_3d_position = np.array([0.6, 0.7, 0.4]) 

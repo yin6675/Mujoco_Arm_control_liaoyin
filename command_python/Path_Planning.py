@@ -23,7 +23,7 @@ class Arm_Path_Planner:
         self._thread_running = False
         self._physics_thread = None
         self._muoco_lock = threading.Lock()
-
+        self.__is_Descartes=False
     # ==========================================
     # 公开 API
     # ==========================================
@@ -40,10 +40,12 @@ class Arm_Path_Planner:
         else:
             print("未设置目标位置")
         return self.target_3d_position
+    # 参数输入的格式是[x,y,z],其中范围是
+    # x：
 
-    def set_target(self, target_3d_position):
+    def set_target(self, target_3d_position, is_Descartes=False):
         self.target_3d_position = np.array(target_3d_position)
-
+        self.__is_Descartes=is_Descartes
     def init_sim(self):
         """打开仿真窗口并启动后台物理线程，立即返回（非阻塞）。
            不用 with，否则退出 with 块时 viewer 会被自动 close。"""
@@ -150,16 +152,29 @@ class Arm_Path_Planner:
 
             joint_waypoints = []
             original_qpos = self.data.qpos.copy()
+            if self.__is_Descartes:
+                for i in range(1, self.num_steps + 1):
+                    interp_pos = now + (target - now) * (i / self.num_steps)
+                    q_waypoint = self._compute_ik(interp_pos)
+                    joint_waypoints.append(q_waypoint)
+                    self.data.qpos[:] = q_waypoint
 
-            for i in range(1, self.num_steps + 1):
-                interp_pos = now + (target - now) * (i / self.num_steps)
-                q_waypoint = self._compute_ik(interp_pos)
-                joint_waypoints.append(q_waypoint)
-                self.data.qpos[:] = q_waypoint
+                self.data.qpos[:] = original_qpos
+                mujoco.mj_kinematics(self.model, self.data)
+            else:
+                 # 2. 用一次 IK 求出目标关节角（终点）
+                q_target = self._compute_ik(self.target_3d_position)
 
-            self.data.qpos[:] = original_qpos
-            mujoco.mj_kinematics(self.model, self.data)
+                # 3. 恢复当前状态（_compute_ik 会内部恢复，但为了清晰可再设一次）
+                self.data.qpos[:] = original_qpos
+                mujoco.mj_kinematics(self.model, self.data)
 
+                # 4. 在关节空间进行线性插值
+                joint_waypoints = []
+                for i in range(1, self.num_steps + 1):
+                    alpha = i / self.num_steps
+                    q_waypoint = original_qpos + (q_target - original_qpos) * alpha
+                    joint_waypoints.append(q_waypoint.copy())
         print(f"成功生成了 {len(joint_waypoints)} 个中间关节路点！")
         return joint_waypoints
 
