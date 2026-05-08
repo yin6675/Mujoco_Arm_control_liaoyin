@@ -5,8 +5,14 @@ import time
 import os
 import threading
 
-
+# 构造参数解释：
+    # model_path: 模型文件路径
+    # site_name: 末端执行器在模型中的名称
+    # num_steps: 每次运动规划中计算的路点数量
+    # max_steps: 最大运动规划步数
+    # tol: 运动规划停止的误差阈值
 class Arm_Path_Planner:
+    
     def __init__(self, model_path, site_name="ee_site", num_steps=100, max_steps=100, tol=1e-4):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         model_path = os.path.join(current_dir, model_path)
