@@ -1,0 +1,3 @@
+mujoco==3.8.0
+mujoco.egg==info
+numpy==2.4.4
