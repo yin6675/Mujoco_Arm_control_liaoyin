@@ -1,0 +1,11 @@
+{
+    "ROS2.distro": "jazzy",
+    "python.autoComplete.extraPaths": [
+        "/home/pope/mujoco/python",
+        "/opt/ros/jazzy/lib/python3.12/site-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/pope/mujoco/python",
+        "/opt/ros/jazzy/lib/python3.12/site-packages"
+    ]
+}

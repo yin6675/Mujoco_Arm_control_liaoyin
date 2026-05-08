@@ -1,0 +1,21 @@
+<launch>
+    <!-- 1. 定义 URDF 和 RViz 配置文件的路径（使用 find-pkg-share 查找包的共享目录） -->
+    <let name="urdf_path"
+         value="$(find-pkg-share my_robot_description)/urdf/ur3.urdf.xacro"/>  <!-- 替换为你的 URDF 路径 -->
+
+    <let name="rviz_config_path"
+         value="$(find-pkg-share my_robot_description)/config/config1.rviz"/>  <!-- 替换为你的 RViz 配置路径 -->
+    <!-- 2. 启动机器人状态发布器（加载 URDF） -->
+    <node pkg="robot_state_publisher" exec="robot_state_publisher">
+        <param name="robot_description"
+               value="$(command 'cat $(var urdf_path)')"/>  <!-- 若 URDF 是 xacro 文件，需改为 xacro $(var urdf_path) -->
+    </node>
+
+    <!-- 3. 启动关节状态发布器 GUI -->
+    <node pkg="joint_state_publisher_gui" exec="joint_state_publisher_gui" />
+
+    <!-- 4. 启动 RViz2 并加载配置 -->
+
+    <node pkg="rviz2" exec="rviz2" output="screen" 
+          args="-d $(var rviz_config_path)"/>  
+</launch>
