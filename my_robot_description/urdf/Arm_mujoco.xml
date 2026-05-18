@@ -82,6 +82,8 @@
         </body>
       </body>
       <site name="base_link_site" pos="0 0 0" quat="1 0 0 0" />
+      <!-- 自定义参考原点：所有路径规划坐标均相对于此点。修改 pos 即可改变原点在世界坐标系中的位置 -->
+      <site name="reference_origin" pos="0.007 0.125 0.7339" />
       <camera name="front_camera" mode="track" fovy="90.0" quat="4.329780281177467e-17 4.329780281177466e-17 0.7071067811865475 0.7071067811865476" pos="0.0 2.0 0.5" />
       <camera name="side_camera" mode="track" fovy="90.0" quat="-0.5 -0.4999999999999999 0.5 0.5000000000000001" pos="-2.0 0.0 0.5" />
     </body>

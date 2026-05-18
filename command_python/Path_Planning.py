@@ -13,7 +13,8 @@ import threading
     # tol: 运动规划停止的误差阈值
 class Arm_Path_Planner:
     
-    def __init__(self, model_path, site_name="ee_site", num_steps=100, max_steps=100, tol=1e-4):
+    def __init__(self, model_path, site_name="ee_site", reference_site_name="reference_origin",
+                 num_steps=100, max_steps=100, tol=1e-4):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         model_path = os.path.join(current_dir, model_path)
         self.model = mujoco.MjModel.from_xml_path(model_path)
@@ -22,6 +23,9 @@ class Arm_Path_Planner:
         self.site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, site_name)
         if self.site_id == -1:
             raise ValueError(f"在XML模型中找不到名为 '{site_name}' 的 site！请检查你的MJCF。")
+        self.reference_site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, reference_site_name)
+        if self.reference_site_id == -1:
+            raise ValueError(f"在XML模型中找不到名为 '{reference_site_name}' 的 site！请检查你的MJCF。")
         self.target_3d_position = None
         self.max_steps = max_steps
         self.num_steps = num_steps
@@ -36,8 +40,10 @@ class Arm_Path_Planner:
     def get_now_position(self):
         with self._muoco_lock:
             mujoco.mj_kinematics(self.model, self.data)
-            now_pos = self.data.site_xpos[self.site_id].copy()
-        print(f"当前位置: {now_pos}")
+            ee_world = self.data.site_xpos[self.site_id].copy()
+            ref_world = self.data.site_xpos[self.reference_site_id].copy()
+            now_pos = ee_world - ref_world
+        print(f"当前位置(相对于参考原点): {now_pos}")
         return now_pos
 
     def get_target_position(self):
@@ -120,47 +126,77 @@ class Arm_Path_Planner:
     def _compute_ik(self, target_pos):
         q_init = self.data.qpos.copy()
 
+        # 构建关节限位：从 jnt_range 映射到 qpos 索引
+        q_min = np.full(self.model.nv, -np.inf)
+        q_max = np.full(self.model.nv, np.inf)
+        for jnt_id in range(self.model.njnt):
+            jnt_type = self.model.jnt_type[jnt_id]
+            if jnt_type in (mujoco.mjtJoint.mjJNT_HINGE, mujoco.mjtJoint.mjJNT_SLIDE):
+                dof_addr = self.model.jnt_dofadr[jnt_id]
+                q_min[dof_addr] = self.model.jnt_range[jnt_id][0]
+                q_max[dof_addr] = self.model.jnt_range[jnt_id][1]
+
+        best_q = q_init.copy()
+        best_error = float('inf')
+
         for _ in range(self.max_steps):
             mujoco.mj_kinematics(self.model, self.data)
-            mujoco.mj_comPos(self.model, self.data)
 
             current_pos = self.data.site_xpos[self.site_id]
             error = target_pos - current_pos
+            error_norm = np.linalg.norm(error)
 
-            if np.linalg.norm(error) < self.tol:
+            if error_norm < best_error:
+                best_error = error_norm
+                best_q = self.data.qpos.copy()
+
+            if error_norm < self.tol:
                 break
 
             jacp = np.zeros((3, self.model.nv))
             mujoco.mj_jacSite(self.model, self.data, jacp, None, self.site_id)
 
-            damping = 1e-3
-            J = jacp
-            J_T = J.T
-            dq = J_T @ np.linalg.inv(J @ J_T + damping**2 * np.eye(3)) @ error
+            # 自适应阻尼：基于雅可比最小奇异值，边界附近自动增大阻尼
+            s = np.linalg.svd(jacp, compute_uv=False)
+            damping = max(s[-1] * 0.1, 1e-2)
 
-            step_size = 0.5
-            self.data.qpos[:] += dq * step_size
+            J_T = jacp.T
+            dq = J_T @ np.linalg.inv(jacp @ J_T + damping**2 * np.eye(3)) @ error
 
-        q_target = self.data.qpos.copy()
+            # 自适应步长：误差大时减小步长，防止冲过限位
+            step_size = min(0.3, 1.0 / (1.0 + error_norm * 10.0))
+            dq = dq * step_size
+
+            # 钳位到关节限位
+            self.data.qpos[:] = np.clip(self.data.qpos + dq, q_min, q_max)
+
+        # 返回迭代过程中的最优解
         self.data.qpos[:] = q_init
         mujoco.mj_kinematics(self.model, self.data)
-        return q_target
+
+        if best_error > 0.01:
+            print(f"警告: IK 未完全收敛, 最优误差={best_error:.4f}m")
+
+        return best_q
 
     def _generate_waypoints(self):
         """生成路点时持有锁，阻止物理线程同时读写 data"""
         with self._muoco_lock:
             mujoco.mj_kinematics(self.model, self.data)
-            now = self.data.site_xpos[self.site_id].copy()
-            target = self.target_3d_position.copy()
+            ref_world = self.data.site_xpos[self.reference_site_id].copy()
+            ee_world = self.data.site_xpos[self.site_id].copy()
+            now = ee_world - ref_world
+            # 用户输入的目标是相对于参考原点的，转换为世界坐标用于 IK
+            target_world = self.target_3d_position.copy() + ref_world
 
-            print(f"当前位置: {now}")
-            print(f"目标位置: {target}")
+            print(f"当前位置(相对参考原点): {now}")
+            print(f"目标位置(相对参考原点): {self.target_3d_position}")
 
             joint_waypoints = []
             original_qpos = self.data.qpos.copy()
             if self.__is_Descartes:
                 for i in range(1, self.num_steps + 1):
-                    interp_pos = now + (target - now) * (i / self.num_steps)
+                    interp_pos = ee_world + (target_world - ee_world) * (i / self.num_steps)
                     q_waypoint = self._compute_ik(interp_pos)
                     joint_waypoints.append(q_waypoint)
                     self.data.qpos[:] = q_waypoint
@@ -169,7 +205,7 @@ class Arm_Path_Planner:
                 mujoco.mj_kinematics(self.model, self.data)
             else:
                  # 2. 用一次 IK 求出目标关节角（终点）
-                q_target = self._compute_ik(self.target_3d_position)
+                q_target = self._compute_ik(target_world)
 
                 # 3. 恢复当前状态（_compute_ik 会内部恢复，但为了清晰可再设一次）
                 self.data.qpos[:] = original_qpos
