@@ -228,7 +228,25 @@ class Arm_Path_Planner:
                     q_waypoint = original_qpos + (q_target - original_qpos) * alpha
                     joint_waypoints.append(q_waypoint.copy())
         print(f"成功生成了 {len(joint_waypoints)} 个中间关节路点！")
+        #调用打印过程中各个路点的函数
+        # self._print_waypoint_summary(joint_waypoints, ref_world)
         return joint_waypoints
+
+    def _joint_to_ee_pos(self, q):
+        """将一组关节角度转为末端相对坐标"""
+        self.data.qpos[:] = q
+        mujoco.mj_kinematics(self.model, self.data)
+        ee_world = self.data.site_xpos[self.site_id].copy()
+        ref_world = self.data.site_xpos[self.reference_site_id].copy()
+        return ee_world - ref_world
+
+    def _print_waypoint_summary(self, waypoints, ref_world):
+        """打印路点的末端三维坐标摘要（首/中/尾）"""
+        indices = [0, len(waypoints) // 2, len(waypoints) - 1]
+        print("\n===== 路点末端坐标摘要 =====")
+        for idx in range(len(waypoints)):
+            pos = self._joint_to_ee_pos(waypoints[idx])
+            print(f"  路点{idx + 1}/{len(waypoints)}: X={pos[0]:.4f} Y={pos[1]:.4f} Z={pos[2]:.4f}")
 
     def __del__(self):
         self.close()

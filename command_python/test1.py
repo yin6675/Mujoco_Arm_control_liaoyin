@@ -24,20 +24,20 @@ def main():
         planner.init_sim()
 
         # 测试1
-        planner.get_now_position()
+        # planner.get_now_position()
         planner.set_target([0.3, -0.3, -0.25])
         if not interrupted:
             planner.gogogo_sim()
-        planner.get_now_position()
-        # 测试2
-        planner.set_target([0.3, 0.3, -0.25])
-        if not interrupted:
-            planner.gogogo_sim()
-        planner.get_now_position()
-        # 保持窗口，响应 Ctrl+C 或等待用户关闭
-        while not interrupted and planner.viewer is not None \
-              and planner.viewer.is_running():
-            time.sleep(0.1)
+        # planner.get_now_position()
+        # # 测试2
+        # planner.set_target([0.3, 0.3, -0.25])
+        # if not interrupted:
+        #     planner.gogogo_sim()
+        # planner.get_now_position()
+        # # 保持窗口，响应 Ctrl+C 或等待用户关闭
+        # while not interrupted and planner.viewer is not None \
+        #       and planner.viewer.is_running():
+        #     time.sleep(0.1)
 
     except KeyboardInterrupt:
         print("\nCtrl+C 收到，正在退出...")
