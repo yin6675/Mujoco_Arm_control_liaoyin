@@ -53,8 +53,9 @@ class Arm_Path_Planner:
             print("未设置目标位置")
         return self.target_3d_position
     # 参数输入的格式是[x,y,z],其中范围是
-    # x：
-
+    # x：0.1 ~ 0.5
+    # y：-0.5 ~ 0.5
+    # z：0 ~ -0.41
     def set_target(self, target_3d_position, is_Descartes=False):
         self.target_3d_position = np.array(target_3d_position)
         self.__is_Descartes=is_Descartes
@@ -82,19 +83,24 @@ class Arm_Path_Planner:
 
         print("开始沿规划路点运动...")
         for waypoint in waypoints:
-            if not self.viewer.is_running():
+            if not self._thread_running or not self.viewer.is_running():
                 break
             with self._muoco_lock:
                 self.data.ctrl[:] = waypoint
-            time.sleep(0.04)  # 给物理线程 ~20 步的时间驱动关节
-        print("到达目标位置！")
+            # 用多次短 sleep 代替一次长 sleep，提高 Ctrl+C 响应速度
+            time.sleep(0.04)
+        if self._thread_running:
+            print("到达目标位置！")
         time.sleep(1)
     def close(self):
         self._thread_running = False
-        if self._physics_thread and self._physics_thread.is_alive():
-            self._physics_thread.join(timeout=2.0)
+        # 不 join 物理线程 —— 它可能卡在 viewer.sync() 的 native GL 调用里，
+        # join 会导致主线程也一起卡死。daemon 线程随进程退出自动清理。
         if self.viewer is not None:
-            self.viewer.close()
+            try:
+                self.viewer.close()
+            except Exception:
+                pass
             self.viewer = None
 
     # ==========================================
@@ -114,10 +120,14 @@ class Arm_Path_Planner:
 
     def _physics_loop(self):
         """所有 mj_step 和 viewer.sync 都在这一个线程里，避免多线程竞争 MuJoCo 数据"""
-        while self._thread_running and self.viewer.is_running():
+        while self._thread_running and self.viewer is not None \
+              and self.viewer.is_running():
             with self._muoco_lock:
                 mujoco.mj_step(self.model, self.data)
-            self.viewer.sync()
+            try:
+                self.viewer.sync()
+            except Exception:
+                break
             time.sleep(0.005)
 
     # ==========================================

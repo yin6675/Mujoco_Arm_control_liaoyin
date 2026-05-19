@@ -1,51 +1,50 @@
 import numpy as np
 import time
+import signal
 import Path_Planning
 
-# ==========================================
-# 1. MuJoCo 仿真与主程序
-# ==========================================
-def main():
 
-    model_path="../my_robot_description/urdf/Arm_mujoco.xml"
-    Arm_Path_Planner = Path_Planning.Arm_Path_Planner(
-        model_path, site_name="ee_site",
+def main():
+    planner = Path_Planning.Arm_Path_Planner(
+        model_path="../my_robot_description/urdf/Arm_mujoco.xml",
+        site_name="ee_site",
         reference_site_name="reference_origin",
         num_steps=200, max_steps=200, tol=1e-3
     )
-    Arm_Path_Planner.init_sim()
 
-    # 测试1: 正常区域，高精度（单坐标 >0.5，另一个 <0.5）
-    Arm_Path_Planner.get_now_position()
-    print("\n===== 测试1: x=0.55, y=0.3 (正常区域) =====")
-    Arm_Path_Planner.set_target([-0.3, -0.3, -0.25])
-    Arm_Path_Planner.gogogo_sim()
-    Arm_Path_Planner.get_now_position()
-    time.sleep(1)
+    interrupted = False
 
-    # # 测试2: 边界区域（双坐标 >0.55，之前会乱甩）
-    print("\n===== 测试2: x=0.55, y=0.55 (边界区域) =====")
-    Arm_Path_Planner.set_target([0.55, 0.55, -0.25])
-    Arm_Path_Planner.gogogo_sim()
-    Arm_Path_Planner.get_now_position()
-    time.sleep(1)
+    def on_interrupt(signum, frame):
+        nonlocal interrupted
+        interrupted = True
+        print("\n收到中断信号，正在退出...")
+    signal.signal(signal.SIGINT, on_interrupt)
 
-    # # 测试3: 远边界区域（双坐标均接近极限）
-    # print("\n===== 测试3: x=-0.3, y=-0.3 (远边界区域) =====")
-    # Arm_Path_Planner.set_target([-0.3, -0.3, -0.25])
-    # Arm_Path_Planner.gogogo_sim()
-    # Arm_Path_Planner.get_now_position()
-    # time.sleep(1)
+    try:
+        planner.init_sim()
 
-    # # 测试4: 回到安全区域
-    # print("\n===== 测试4: x=0.3, y=0.3 (回到安全区域) =====")
-    # Arm_Path_Planner.set_target([0.3, 0.3, 0.25])
-    # Arm_Path_Planner.gogogo_sim()
-    # Arm_Path_Planner.get_now_position()
-    # time.sleep(1)
+        # 测试1
+        planner.get_now_position()
+        planner.set_target([0.3, -0.3, -0.25])
+        if not interrupted:
+            planner.gogogo_sim()
+        planner.get_now_position()
+        # 测试2
+        planner.set_target([0.3, 0.3, -0.25])
+        if not interrupted:
+            planner.gogogo_sim()
+        planner.get_now_position()
+        # 保持窗口，响应 Ctrl+C 或等待用户关闭
+        while not interrupted and planner.viewer is not None \
+              and planner.viewer.is_running():
+            time.sleep(0.1)
 
-    while 1:
-        pass
+    except KeyboardInterrupt:
+        print("\nCtrl+C 收到，正在退出...")
+    finally:
+        planner.close()
+        print("资源已清理，进程退出。")
+
 
 if __name__ == "__main__":
     main()
