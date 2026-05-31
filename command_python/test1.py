@@ -7,7 +7,7 @@ from pynput import keyboard   # 需要安装：pip install pynput
 
 # ========== 全局停止标志和键盘监听 ==========
 stop_program = False
-
+# 
 def on_press(key):
     global stop_program
     try:
