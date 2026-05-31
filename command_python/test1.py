@@ -7,7 +7,7 @@ from pynput import keyboard   # 需要安装：pip install pynput
 
 # ========== 全局停止标志和键盘监听 ==========
 stop_program = False
-# 
+
 def on_press(key):
     global stop_program
     try:
@@ -118,7 +118,7 @@ def main(robot: HitbotInterface):
         model_path="../my_robot_description/urdf/Arm_mujoco.xml",
         site_name="ee_site",
         reference_site_name="reference_origin",
-        num_steps=200, max_steps=200, tol=1e-3
+        num_steps=100, max_steps=200, tol=1e-3
     )
     interrupted = False
 
@@ -141,9 +141,10 @@ def main(robot: HitbotInterface):
                 return
             print(f"开始沿 {len(waypoints)} 个路点运动（关节角度模式, roughly={roughly})")
             for i, q_waypoint in enumerate(waypoints):
+                # 每次循环开始前检查停止标志
                 if stop_program:
-                    print("检测到停止信号，终止后续路点发送。")
-                    break
+                    print("检测到停止信号，立即退出运动。")
+                    return
                 # 正确索引：q[0]=z, q[1]=angle1, q[2]=angle2, q[3]=r
                 z_m = q_waypoint[0]
                 angle1_rad = q_waypoint[1]
@@ -161,8 +162,13 @@ def main(robot: HitbotInterface):
                 move_ret = robot.new_movej_angle(angle1_deg, angle2_deg, z_mm, r_deg, speed, roughly)
                 if move_ret != 1:
                     print(f"运动指令失败，错误码 {move_ret}，终止运动")
-                    break
+                    return
                 time.sleep(0.05)
+                # 延时后再次检查，如果用户按下了ESC，立即返回
+                if stop_program:
+                    print("检测到停止信号，立即退出运动。")
+                    return
+            # 正常完成所有路点后才等待停止
             if not stop_program:
                 robot.wait_stop()
                 print("真实机械臂运动完成")
@@ -201,12 +207,12 @@ def main(robot: HitbotInterface):
         planner.set_target([0.3, -0.3, -0.25])
 
         # # 选项A：先仿真测试（注释掉这行，看轨迹）
-        if not interrupted:
-            planner.gogogo_sim()
+        # if not interrupted:
+        #     planner.gogogo_sim()
 
         # 选项B：确认轨迹没问题后，改为真实运动（取消下面的注释，并注释上面的仿真）
-        # if not interrupted:
-        #     planner.gogogo_real(robot, speed=150, roughly=1)
+        if not interrupted:
+            planner.gogogo_real(robot, speed=150, roughly=1)
 
         # ========== 测试点2 ==========
         # planner.set_target([0.4, -0.4, -0.25])
@@ -230,21 +236,21 @@ def main(robot: HitbotInterface):
         print("资源已清理，进程退出。")
 
 # 真实机械臂模式（默认启用）
-# if __name__ == "__main__":
-#     # 机械臂ID
-#     ROBOT_ID = 175
-#     # 400mm臂展传1，320mm及其他传5
-#     ROBOT_GENERATION = 5
-#     # 上下关节有效行程，单位mm
-#     ROBOT_Z_TRAVEL = 410
-#     # 执行初始化,
-#     robot = init_robot(ROBOT_ID, ROBOT_GENERATION, ROBOT_Z_TRAVEL)
-#     # 后续可通过robot对象调用各类控制接口实现机械臂操控
-#     if robot:
-#         main(robot)
+if __name__ == "__main__":
+    # 机械臂ID
+    ROBOT_ID = 175
+    # 400mm臂展传1，320mm及其他传5
+    ROBOT_GENERATION = 5
+    # 上下关节有效行程，单位mm
+    ROBOT_Z_TRAVEL = 410
+    # 执行初始化,
+    robot = init_robot(ROBOT_ID, ROBOT_GENERATION, ROBOT_Z_TRAVEL)
+    # 后续可通过robot对象调用各类控制接口实现机械臂操控
+    if robot:
+        main(robot)
 
 # 纯仿真模式（如需使用，请注释上面的块，取消下面块的注释）
-if __name__ == "__main__":
-    # 纯仿真测试（不连接真实机械臂）
-    robot = None
-    main(robot)
+# if __name__ == "__main__":
+#     # 纯仿真测试（不连接真实机械臂）
+#     robot = None
+#     main(robot)
